@@ -1,0 +1,184 @@
+// import_tool — P5 import orchestration CLI (thin argv wrapper over AYImportJob)
+//
+// Core logic lives in AYResource (AYImportJob.h). This EXE only parses args
+// and prints progress / exit codes.
+
+#include "AYImportJob.h"
+
+#include <cstring>
+#include <iostream>
+#include <string>
+#include <vector>
+
+using ayt::resource::ImportBatchOptions;
+using ayt::resource::ImportBatchResult;
+using ayt::resource::ImportOptions;
+using ayt::resource::ImportProgress;
+using ayt::resource::ImportResult;
+using ayt::resource::ImportStage;
+using ayt::resource::IConverter;
+using ayt::resource::importAsset;
+using ayt::resource::importAssetBatch;
+
+static void printUsage(const char* exe)
+{
+    std::cerr
+        << "Usage: " << exe << " --in <file> --out <assetsDir> [options]\n"
+        << "       " << exe << " --in <file1> --in <file2> ... --out <assetsDir>\n"
+        << "\n"
+        << "Import source assets (FBX/glTF/textures) into a cooked .ay* cache tree.\n"
+        << "Matches EditorShellDemo layout: typically --out ayeditor_cache/assets\n"
+        << "\n"
+        << "Required:\n"
+        << "  --in <path>        Source file (repeatable for batch)\n"
+        << "  --out <dir>        Output assets root (meshes/, materials/, …)\n"
+        << "\n"
+        << "Options:\n"
+        << "  --force            Ignore .aydep.json cache reuse\n"
+        << "  --mesh-only        IConverter::LoadOption::MeshOnly\n"
+        << "  --no-character     Do not require Mesh+Skeleton for FBX cache hits\n"
+        << "  --stop-on-error    Abort batch after first failure\n"
+        << "  -h, --help         Show this help\n"
+        << "\n"
+        << "Example:\n"
+        << "  " << exe << " --in model.fbx --out ayeditor_cache/assets\n"
+        << "  " << exe << " --in a.fbx --in b.fbx --out cache/assets --force\n";
+}
+
+static const char* stageName(ImportStage s)
+{
+    switch (s) {
+    case ImportStage::Validate: return "validate";
+    case ImportStage::CheckCache: return "cache";
+    case ImportStage::CacheHit: return "cache-hit";
+    case ImportStage::CreateConverter: return "create";
+    case ImportStage::Convert: return "convert";
+    case ImportStage::Done: return "done";
+    case ImportStage::Cancelled: return "cancelled";
+    case ImportStage::Failed: return "failed";
+    }
+    return "?";
+}
+
+int main(int argc, char* argv[])
+{
+    std::vector<std::string> inputs;
+    std::string outDir;
+    bool force = false;
+    bool meshOnly = false;
+    bool requireCharacter = true;
+    bool stopOnError = false;
+
+    for (int i = 1; i < argc; ++i) {
+        const char* a = argv[i];
+        auto need = [&](const char* flag) -> const char* {
+            if (i + 1 >= argc) {
+                std::cerr << "Error: " << flag << " requires an argument\n";
+                std::exit(1);
+            }
+            return argv[++i];
+        };
+
+        if (std::strcmp(a, "-h") == 0 || std::strcmp(a, "--help") == 0) {
+            printUsage(argv[0]);
+            return 0;
+        }
+        if (std::strcmp(a, "--in") == 0) {
+            inputs.emplace_back(need("--in"));
+            continue;
+        }
+        if (std::strcmp(a, "--out") == 0) {
+            outDir = need("--out");
+            continue;
+        }
+        if (std::strcmp(a, "--force") == 0) {
+            force = true;
+            continue;
+        }
+        if (std::strcmp(a, "--mesh-only") == 0) {
+            meshOnly = true;
+            continue;
+        }
+        if (std::strcmp(a, "--no-character") == 0) {
+            requireCharacter = false;
+            continue;
+        }
+        if (std::strcmp(a, "--stop-on-error") == 0) {
+            stopOnError = true;
+            continue;
+        }
+
+        std::cerr << "Error: unknown argument '" << a << "'\n";
+        printUsage(argv[0]);
+        return 1;
+    }
+
+    if (inputs.empty() || outDir.empty()) {
+        printUsage(argv[0]);
+        return 1;
+    }
+
+    auto onProgress = [](const ImportProgress& p) {
+        std::cout << "[import_tool] " << stageName(p.stage)
+                  << " " << static_cast<int>(p.fraction * 100.0f) << "% "
+                  << p.message << "\n";
+    };
+
+    if (inputs.size() == 1) {
+        ImportOptions opts;
+        opts.sourcePath = inputs[0];
+        opts.outputDir = outDir;
+        opts.force = force;
+        opts.requireCharacterAssets = requireCharacter;
+        opts.loadOption = meshOnly ? IConverter::LoadOption::MeshOnly
+                                   : IConverter::LoadOption::Full;
+
+        std::cout << "[import_tool] in=" << opts.sourcePath
+                  << " out=" << opts.outputDir << "\n";
+
+        const ImportResult result = importAsset(opts, onProgress, nullptr);
+        if (result.cancelled) {
+            std::cerr << "[import_tool] CANCELLED\n";
+            return 3;
+        }
+        if (!result.ok) {
+            std::cerr << "[import_tool] FAILED: " << result.error << "\n";
+            return 2;
+        }
+        std::cout << "[import_tool] OK cache=" << (result.usedCache ? "hit" : "miss")
+                  << " resources=" << result.conversion.resources.size() << "\n";
+        return 0;
+    }
+
+    ImportBatchOptions batch;
+    batch.sourcePaths = std::move(inputs);
+    batch.outputDir = outDir;
+    batch.force = force;
+    batch.requireCharacterAssets = requireCharacter;
+    batch.stopOnError = stopOnError;
+    batch.loadOption = meshOnly ? IConverter::LoadOption::MeshOnly
+                                : IConverter::LoadOption::Full;
+
+    std::cout << "[import_tool] batch count=" << batch.sourcePaths.size()
+              << " out=" << batch.outputDir << "\n";
+
+    const ImportBatchResult result = importAssetBatch(batch, onProgress, nullptr);
+    std::cout << "[import_tool] batch done ok=" << result.okCount
+              << " fail=" << result.failCount
+              << " cacheHits=" << result.cacheHitCount
+              << " cancelled=" << result.cancelledCount << "\n";
+
+    if (result.cancelledCount > 0) {
+        return 3;
+    }
+    if (result.failCount > 0) {
+        for (size_t i = 0; i < result.results.size(); ++i) {
+            if (!result.results[i].ok && !result.results[i].cancelled) {
+                std::cerr << "[import_tool] FAIL[" << i << "]: "
+                          << result.results[i].error << "\n";
+            }
+        }
+        return 2;
+    }
+    return 0;
+}
