@@ -1,33 +1,21 @@
-cmake_minimum_required(VERSION 3.12)
-project(package_tool)
+cmake_minimum_required(VERSION 3.20)
 
 set(TOOL_NAME package_tool)
 
-set(SRC_FILES
+add_executable(${TOOL_NAME}
     src/main.cpp
 )
 
-add_executable(${TOOL_NAME} ${SRC_FILES})
-
 target_include_directories(${TOOL_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../AYStorage/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../AYIO/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../AYTime/include
 )
 
+# Core libs live under AYFoundation (not AYRuntime/AYStorage).
 target_link_libraries(${TOOL_NAME} PRIVATE
     AYStorage
     AYIO
-    AYTime
 )
 
-find_package(zstd CONFIG REQUIRED)
-find_package(lz4 CONFIG REQUIRED)
-find_package(unofficial-sqlite3 CONFIG REQUIRED)
-
-target_link_libraries(${TOOL_NAME} PRIVATE
-    zstd::libzstd
-    lz4::lz4
-    unofficial::sqlite3::sqlite3
-)
+if(MSVC)
+    target_compile_options(${TOOL_NAME} PRIVATE /utf-8)
+endif()
