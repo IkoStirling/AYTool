@@ -1,9 +1,9 @@
 // cook_tool — P4 ship builder CLI (thin argv wrapper over AYResource::cookShipPackage)
 //
-// Core logic lives in AYResource (AYCookShip.h). This EXE only parses args
+// Core logic lives in AYResource (AYResource/CookShip.h). This EXE only parses args
 // and prints progress / exit codes.
 
-#include "AYCookShip.h"
+#include "AYResource/CookShip.h"
 
 #include <cstring>
 #include <iostream>

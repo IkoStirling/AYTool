@@ -1,9 +1,9 @@
 // import_tool — P5 import orchestration CLI (thin argv wrapper over AYImportJob)
 //
-// Core logic lives in AYResource (AYImportJob.h). This EXE only parses args
+// Core logic lives in AYResource (AYResource/ImportJob.h). This EXE only parses args
 // and prints progress / exit codes.
 
-#include "AYImportJob.h"
+#include "AYResource/ImportJob.h"
 
 #include <cstring>
 #include <iostream>
