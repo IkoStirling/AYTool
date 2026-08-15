@@ -2,7 +2,7 @@
 #include <string>
 #include <vector>
 #include <cstring>
-#include "aystorage/IResourceMetaIndex.h"
+#include "AYStorage/IResourceMetaIndex.h"
 
 using namespace ayt::storage;
 
