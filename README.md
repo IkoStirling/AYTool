@@ -20,7 +20,7 @@ import_tool --in a.fbx --in b.fbx --out ayeditor_cache/assets
 Aligns with `EditorShellDemo` / `EditorPlayRuntime::resolvePersistentCacheRoot()`:
 `--out` should be the `assets\` directory under `ayeditor_cache`.
 
-Core API: `AYResource/include/AYResource/ImportJob.h` → `importAsset()` / `importAssetBatch()`.
+Core API: `AYResource/ImportJob.h` → `importAsset()` / `importAssetBatch()`.
 
 ## cook_tool
 
@@ -35,4 +35,4 @@ ayt::resource::ResourceManager::instance().openDatabase("ship/resources.db");
 // then load<T>("meshes/hero.aymesh") prefers pak via DB
 ```
 
-Core API: `AYResource/include/AYResource/CookShip.h` → `cookShipPackage()`.
+Core API: `AYResource/CookShip.h` → `cookShipPackage()`.
