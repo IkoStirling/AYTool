@@ -5,6 +5,8 @@
 
 #include "AYResource/ImportJob.h"
 
+#include <AYIO/Env.h>
+
 #include <cstring>
 #include <iostream>
 #include <string>
@@ -19,6 +21,13 @@ using ayt::resource::ImportStage;
 using ayt::resource::IConverter;
 using ayt::resource::importAsset;
 using ayt::resource::importAssetBatch;
+
+// Env fallback for --cook-textures (non-empty and not '0' → true).
+static bool envTrue(const char* name)
+{
+    const auto v = ayt::io::env::get(name);
+    return v.has_value() && !v->empty() && (*v)[0] != '0';
+}
 
 static void printUsage(const char* exe)
 {
@@ -38,6 +47,9 @@ static void printUsage(const char* exe)
         << "  --mesh-only        IConverter::LoadOption::MeshOnly\n"
         << "  --no-character     Do not require Mesh+Skeleton for FBX cache hits\n"
         << "  --stop-on-error    Abort batch after first failure\n"
+        << "  --cook-textures    Release cook: BC7+mips to .aytex (default: dev\n"
+        << "                     mode — textures referenced raw as .png/.jpg)\n"
+        << "                     Also honors env AY_IMPORT_COOK_TEXTURES=1\n"
         << "  -h, --help         Show this help\n"
         << "\n"
         << "Example:\n"
@@ -68,6 +80,7 @@ int main(int argc, char* argv[])
     bool meshOnly = false;
     bool requireCharacter = true;
     bool stopOnError = false;
+    bool cookTextures = false;
 
     for (int i = 1; i < argc; ++i) {
         const char* a = argv[i];
@@ -107,6 +120,10 @@ int main(int argc, char* argv[])
             stopOnError = true;
             continue;
         }
+        if (std::strcmp(a, "--cook-textures") == 0) {
+            cookTextures = true;
+            continue;
+        }
 
         std::cerr << "Error: unknown argument '" << a << "'\n";
         printUsage(argv[0]);
@@ -132,6 +149,8 @@ int main(int argc, char* argv[])
         opts.requireCharacterAssets = requireCharacter;
         opts.loadOption = meshOnly ? IConverter::LoadOption::MeshOnly
                                    : IConverter::LoadOption::Full;
+        opts.cookTextures = cookTextures
+            || envTrue("AY_IMPORT_COOK_TEXTURES");
 
         std::cout << "[import_tool] in=" << opts.sourcePath
                   << " out=" << opts.outputDir << "\n";
@@ -158,6 +177,8 @@ int main(int argc, char* argv[])
     batch.stopOnError = stopOnError;
     batch.loadOption = meshOnly ? IConverter::LoadOption::MeshOnly
                                 : IConverter::LoadOption::Full;
+    batch.cookTextures = cookTextures
+        || envTrue("AY_IMPORT_COOK_TEXTURES");
 
     std::cout << "[import_tool] batch count=" << batch.sourcePaths.size()
               << " out=" << batch.outputDir << "\n";
