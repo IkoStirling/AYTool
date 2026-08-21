@@ -22,6 +22,18 @@ using ayt::resource::IConverter;
 using ayt::resource::importAsset;
 using ayt::resource::importAssetBatch;
 
+static bool parseAxis(const std::string& text, ayt::resource::ImportAxis& out)
+{
+    if (text == "+X" || text == "X") out = ayt::resource::ImportAxis::PositiveX;
+    else if (text == "-X") out = ayt::resource::ImportAxis::NegativeX;
+    else if (text == "+Y" || text == "Y") out = ayt::resource::ImportAxis::PositiveY;
+    else if (text == "-Y") out = ayt::resource::ImportAxis::NegativeY;
+    else if (text == "+Z" || text == "Z") out = ayt::resource::ImportAxis::PositiveZ;
+    else if (text == "-Z") out = ayt::resource::ImportAxis::NegativeZ;
+    else return false;
+    return true;
+}
+
 // Env fallback for --cook-textures (non-empty and not '0' → true).
 static bool envTrue(const char* name)
 {
@@ -50,6 +62,12 @@ static void printUsage(const char* exe)
         << "  --cook-textures    Release cook: BC7+mips to .aytex (default: dev\n"
         << "                     mode — textures referenced raw as .png/.jpg)\n"
         << "                     Also honors env AY_IMPORT_COOK_TEXTURES=1\n"
+        << "  --source-coordinates auto|manual\n"
+        << "  --source-up <+X|-X|+Y|-Y|+Z|-Z>       Manual source Up axis\n"
+        << "  --source-forward <axis>                Manual source Forward axis\n"
+        << "  --source-handedness left|right         Manual source handedness\n"
+        << "  --source-meters-per-unit <float>       0 uses file unit metadata\n"
+        << "  --source-coordinate-tag <text>         Cache/preset discriminator\n"
         << "  -h, --help         Show this help\n"
         << "\n"
         << "Example:\n"
@@ -81,6 +99,7 @@ int main(int argc, char* argv[])
     bool requireCharacter = true;
     bool stopOnError = false;
     bool cookTextures = false;
+    ayt::resource::SourceCoordinatePolicy sourceCoordinates;
 
     for (int i = 1; i < argc; ++i) {
         const char* a = argv[i];
@@ -124,6 +143,41 @@ int main(int argc, char* argv[])
             cookTextures = true;
             continue;
         }
+        if (std::strcmp(a, "--source-coordinates") == 0) {
+            const std::string value = need("--source-coordinates");
+            if (value == "manual") sourceCoordinates.mode = ayt::resource::SourceCoordinateMode::Manual;
+            else if (value == "auto") sourceCoordinates.mode = ayt::resource::SourceCoordinateMode::Auto;
+            else { std::cerr << "Error: source coordinates must be auto or manual\n"; return 1; }
+            continue;
+        }
+        if (std::strcmp(a, "--source-up") == 0) {
+            if (!parseAxis(need("--source-up"), sourceCoordinates.up)) {
+                std::cerr << "Error: invalid --source-up axis\n"; return 1;
+            }
+            continue;
+        }
+        if (std::strcmp(a, "--source-forward") == 0) {
+            if (!parseAxis(need("--source-forward"), sourceCoordinates.forward)) {
+                std::cerr << "Error: invalid --source-forward axis\n"; return 1;
+            }
+            continue;
+        }
+        if (std::strcmp(a, "--source-handedness") == 0) {
+            const std::string value = need("--source-handedness");
+            if (value == "left") sourceCoordinates.handedness = ayt::resource::ImportHandedness::Left;
+            else if (value == "right") sourceCoordinates.handedness = ayt::resource::ImportHandedness::Right;
+            else { std::cerr << "Error: handedness must be left or right\n"; return 1; }
+            continue;
+        }
+        if (std::strcmp(a, "--source-meters-per-unit") == 0) {
+            try { sourceCoordinates.metersPerUnit = std::stof(need("--source-meters-per-unit")); }
+            catch (...) { std::cerr << "Error: invalid meters-per-unit\n"; return 1; }
+            continue;
+        }
+        if (std::strcmp(a, "--source-coordinate-tag") == 0) {
+            sourceCoordinates.tag = need("--source-coordinate-tag");
+            continue;
+        }
 
         std::cerr << "Error: unknown argument '" << a << "'\n";
         printUsage(argv[0]);
@@ -151,6 +205,7 @@ int main(int argc, char* argv[])
                                    : IConverter::LoadOption::Full;
         opts.cookTextures = cookTextures
             || envTrue("AY_IMPORT_COOK_TEXTURES");
+        opts.sourceCoordinates = sourceCoordinates;
 
         std::cout << "[import_tool] in=" << opts.sourcePath
                   << " out=" << opts.outputDir << "\n";
@@ -179,6 +234,7 @@ int main(int argc, char* argv[])
                                 : IConverter::LoadOption::Full;
     batch.cookTextures = cookTextures
         || envTrue("AY_IMPORT_COOK_TEXTURES");
+    batch.sourceCoordinates = sourceCoordinates;
 
     std::cout << "[import_tool] batch count=" << batch.sourcePaths.size()
               << " out=" << batch.outputDir << "\n";
