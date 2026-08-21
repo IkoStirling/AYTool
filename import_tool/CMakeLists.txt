@@ -9,6 +9,7 @@ add_executable(${TOOL_NAME}
 target_link_libraries(${TOOL_NAME} PRIVATE
     AYResource
     AYIO
+    AYLog
 )
 
 if(MSVC)

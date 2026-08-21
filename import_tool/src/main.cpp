@@ -6,6 +6,7 @@
 #include "AYResource/ImportJob.h"
 
 #include <AYIO/Env.h>
+#include <AYLog.h>
 
 #include <cstring>
 #include <iostream>
@@ -66,6 +67,7 @@ static void printUsage(const char* exe)
         << "  --source-up <+X|-X|+Y|-Y|+Z|-Z>       Manual source Up axis\n"
         << "  --source-forward <axis>                Manual source Forward axis\n"
         << "  --source-handedness left|right         Manual source handedness\n"
+        << "  --source-uv-origin top-left|bottom-left Source texture UV origin\n"
         << "  --source-meters-per-unit <float>       0 uses file unit metadata\n"
         << "  --source-coordinate-tag <text>         Cache/preset discriminator\n"
         << "  -h, --help         Show this help\n"
@@ -92,6 +94,18 @@ static const char* stageName(ImportStage s)
 
 int main(int argc, char* argv[])
 {
+    ayt::log::LogConfig logConfig;
+    logConfig.fileEnabled = false;
+    logConfig.crashHandlerEnabled = false;
+    logConfig.rateLimit.enabled = false;
+    ayt::log::initialize(logConfig);
+    struct LogLifetime {
+        ~LogLifetime() {
+            ayt::log::flush();
+            ayt::log::shutdown();
+        }
+    } logLifetime;
+
     std::vector<std::string> inputs;
     std::string outDir;
     bool force = false;
@@ -167,6 +181,20 @@ int main(int argc, char* argv[])
             if (value == "left") sourceCoordinates.handedness = ayt::resource::ImportHandedness::Left;
             else if (value == "right") sourceCoordinates.handedness = ayt::resource::ImportHandedness::Right;
             else { std::cerr << "Error: handedness must be left or right\n"; return 1; }
+            continue;
+        }
+        if (std::strcmp(a, "--source-uv-origin") == 0) {
+            const std::string value = need("--source-uv-origin");
+            if (value == "top-left") {
+                sourceCoordinates.uvOrigin =
+                    ayt::resource::ImportUvOrigin::TopLeft;
+            } else if (value == "bottom-left") {
+                sourceCoordinates.uvOrigin =
+                    ayt::resource::ImportUvOrigin::BottomLeft;
+            } else {
+                std::cerr << "Error: UV origin must be top-left or bottom-left\n";
+                return 1;
+            }
             continue;
         }
         if (std::strcmp(a, "--source-meters-per-unit") == 0) {
