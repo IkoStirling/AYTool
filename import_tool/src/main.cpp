@@ -58,6 +58,8 @@ static void printUsage(const char* exe)
         << "Options:\n"
         << "  --force            Ignore .aydep.json cache reuse\n"
         << "  --mesh-only        IConverter::LoadOption::MeshOnly\n"
+        << "  --animation-only   Extract Animation resources only; do not cook\n"
+        << "                     meshes, materials, textures, or helper geometry\n"
         << "  --no-character     Do not require Mesh+Skeleton for FBX cache hits\n"
         << "  --stop-on-error    Abort batch after first failure\n"
         << "  --cook-textures    Release cook: BC7+mips to .aytex (default: dev\n"
@@ -110,6 +112,7 @@ int main(int argc, char* argv[])
     std::string outDir;
     bool force = false;
     bool meshOnly = false;
+    bool animationOnly = false;
     bool requireCharacter = true;
     bool stopOnError = false;
     bool cookTextures = false;
@@ -143,6 +146,10 @@ int main(int argc, char* argv[])
         }
         if (std::strcmp(a, "--mesh-only") == 0) {
             meshOnly = true;
+            continue;
+        }
+        if (std::strcmp(a, "--animation-only") == 0) {
+            animationOnly = true;
             continue;
         }
         if (std::strcmp(a, "--no-character") == 0) {
@@ -216,6 +223,10 @@ int main(int argc, char* argv[])
         printUsage(argv[0]);
         return 1;
     }
+    if (meshOnly && animationOnly) {
+        std::cerr << "Error: --mesh-only and --animation-only are mutually exclusive\n";
+        return 1;
+    }
 
     auto onProgress = [](const ImportProgress& p) {
         std::cout << "[import_tool] " << stageName(p.stage)
@@ -228,8 +239,10 @@ int main(int argc, char* argv[])
         opts.sourcePath = inputs[0];
         opts.outputDir = outDir;
         opts.force = force;
-        opts.requireCharacterAssets = requireCharacter;
-        opts.loadOption = meshOnly ? IConverter::LoadOption::MeshOnly
+        opts.requireCharacterAssets = requireCharacter && !animationOnly;
+        opts.requireAnimationAssets = animationOnly;
+        opts.loadOption = animationOnly ? IConverter::LoadOption::AnimationOnly
+                        : meshOnly ? IConverter::LoadOption::MeshOnly
                                    : IConverter::LoadOption::Full;
         opts.cookTextures = cookTextures
             || envTrue("AY_IMPORT_COOK_TEXTURES");
@@ -256,9 +269,11 @@ int main(int argc, char* argv[])
     batch.sourcePaths = std::move(inputs);
     batch.outputDir = outDir;
     batch.force = force;
-    batch.requireCharacterAssets = requireCharacter;
+    batch.requireCharacterAssets = requireCharacter && !animationOnly;
+    batch.requireAnimationAssets = animationOnly;
     batch.stopOnError = stopOnError;
-    batch.loadOption = meshOnly ? IConverter::LoadOption::MeshOnly
+    batch.loadOption = animationOnly ? IConverter::LoadOption::AnimationOnly
+                     : meshOnly ? IConverter::LoadOption::MeshOnly
                                 : IConverter::LoadOption::Full;
     batch.cookTextures = cookTextures
         || envTrue("AY_IMPORT_COOK_TEXTURES");
