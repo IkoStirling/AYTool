@@ -7,12 +7,12 @@ add_executable(${TOOL_NAME}
 )
 
 target_link_libraries(${TOOL_NAME} PRIVATE
-    AYResource
+    AYResourceCook
     AYStorage
     AYIO
 )
 
-# AYResource already pulls Assimp/etc.; keep tool lean.
+# Cook consumes the runtime metadata/package contract without importer SDKs.
 if(MSVC)
     target_compile_options(${TOOL_NAME} PRIVATE /utf-8)
 endif()
