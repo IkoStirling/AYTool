@@ -11,5 +11,6 @@ add_subdirectory(index_tool)
 add_subdirectory(cook_tool)
 add_subdirectory(import_tool)
 add_subdirectory(project_build_tool)
+add_subdirectory(project_init_tool)
 
-message(STATUS "AYTool v0.2.0 (project build + import/cook/package/index CLIs)")
+message(STATUS "AYTool v0.3.0 (project init/build + import/cook/package/index CLIs)")

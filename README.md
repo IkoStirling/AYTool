@@ -9,7 +9,21 @@ Offline CLIs for the Aliyat content pipeline. **Business logic stays in librarie
 | `cook_tool` | **P4 primary** — cooked `.ay*` tree → `content.pak` + `resources.db` |
 | `package_tool` | Low-level pak writer (`IPackageWriter`) |
 | `index_tool` | Scan helper (`IResourceMetaIndex`; not the ship DB) |
+| `project_init_tool` | Create the canonical standalone game project scaffold |
 | `project_build_tool` | Project profile → CMake build + incremental cook cache + loose/Pak staging |
+
+## project_init_tool
+
+```bat
+project_init_tool --output D:\Games\MyGame --name "My Game" ^
+  --profile client-3d
+```
+
+The reusable implementation lives in `AYProject/ProjectScaffold.h`; this EXE
+is only its command-line adapter. It refuses to merge into an existing path.
+The generated presets point at the engine checkout's shared
+`out/build/vcpkg_installed` tree and include Headless/Full Client content
+validation tests.
 
 ## project_build_tool
 
