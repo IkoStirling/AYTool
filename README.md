@@ -40,6 +40,12 @@ Use `--plan` to inspect the deterministic plan, `--cache-only`/`--no-cook` to
 forbid conversion, or `--force-cook` to bypass cache hits. A successful code
 build writes `.ayeditor/builds/last-success.json` for Editor Project Run.
 
+When code is enabled, publication copies the configured executable and the
+platform runtime libraries placed beside it by CMake/vcpkg. The generated
+release profile starts from the package root with `-asset-root Content`.
+Automation may append `--validate-startup` to verify the final staging directory
+without opening a window.
+
 ## import_tool
 
 ```bat
