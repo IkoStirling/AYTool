@@ -46,6 +46,14 @@ release profile starts from the package root with `-asset-root Content`.
 Automation may append `--validate-startup` to verify the final staging directory
 without opening a window.
 
+On Windows, package-directory publication retries short-lived access/sharing
+contention with a 250 ms retry budget and at most 26 attempts per operation.
+Persistent failures include the phase, paths, OS error and attempt count.
+Failed publication restores the old package; failed rollback retains `.previous`
+for recovery on the next build. Backup cleanup after a committed publication is
+reported as a warning. There is no non-atomic fallback or support for concurrent
+builds targeting the same output directory.
+
 ## import_tool
 
 ```bat
