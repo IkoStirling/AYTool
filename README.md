@@ -66,6 +66,15 @@ Aligns with `EditorShellDemo` / `EditorPlayRuntime::resolvePersistentCacheRoot()
 
 Core API: `AYResource/ImportJob.h` → `importAsset()` / `importAssetBatch()`.
 
+With particle authoring enabled, `.ayparticle` imports validate the effect and
+its texture closure, preserve its Assets-relative filename and rewrite texture
+paths. Use `--cook-textures` for publishing (lossless RGBA8 `.aytex` + mipmaps);
+dev imports can keep raw textures. Project profiles use `cookTextures:true`.
+Missing/excluded dependencies and scene effect references fail preflight, and
+texture bytes participate in the effect cache key. Particle scenes remain Loose.
+See [ParticleLibrary](../AYParticle/examples/ParticleLibrary/README.md) for the
+five-effect example and packaged playback verification.
+
 ## cook_tool
 
 ```bat
