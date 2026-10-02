@@ -29,7 +29,7 @@ validation tests.
 
 ```bat
 project_build_tool --project <project-root> ^
-  --profile BuildProfiles/windows-development.aybuild.json
+  --profile BuildProfiles/windows-development.bld
 ```
 
 The checked-in profile independently selects asset representation
@@ -66,9 +66,9 @@ Aligns with `EditorShellDemo` / `EditorPlayRuntime::resolvePersistentCacheRoot()
 
 Core API: `AYResource/ImportJob.h` → `importAsset()` / `importAssetBatch()`.
 
-With particle authoring enabled, `.ayparticle` imports validate the effect and
+With particle authoring enabled, `.pfx` imports validate the effect and
 its texture closure, preserve its Assets-relative filename and rewrite texture
-paths. Use `--cook-textures` for publishing (lossless RGBA8 `.aytex` + mipmaps);
+paths. Use `--cook-textures` for publishing (lossless RGBA8 `.txr` + mipmaps);
 dev imports can keep raw textures. Project profiles use `cookTextures:true`.
 Missing/excluded dependencies and scene effect references fail preflight, and
 texture bytes participate in the effect cache key. Particle scenes remain Loose.
@@ -85,7 +85,7 @@ Runtime mount:
 
 ```cpp
 ayt::resource::ResourceManager::instance().openDatabase("ship/resources.db");
-// then load<T>("meshes/hero.aymesh") prefers pak via DB
+// then load<T>("meshes/hero.msh") prefers pak via DB
 ```
 
 Core API: `AYResource/CookShip.h` → `cookShipPackage()`.

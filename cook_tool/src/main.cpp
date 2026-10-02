@@ -22,7 +22,7 @@ static void printUsage(const char* exe)
         << "Build a shippable content.pak + resources.db from a cooked .ay* tree.\n"
         << "\n"
         << "Required:\n"
-        << "  --assets <dir>     Root directory of cooked assets (.aymesh, .aymat, ...)\n"
+        << "  --assets <dir>     Root directory of cooked assets (.msh, .mat, ...)\n"
         << "  --out <dir>        Output ship directory\n"
         << "\n"
         << "Options:\n"
