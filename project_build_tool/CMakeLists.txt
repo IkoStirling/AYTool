@@ -5,6 +5,7 @@ set(TOOL_NAME project_build_tool)
 add_executable(${TOOL_NAME}
     src/main.cpp
 )
+ay_stage_audio_cook_assets(${TOOL_NAME})
 
 target_link_libraries(${TOOL_NAME} PRIVATE
     AYProjectBuild

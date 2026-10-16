@@ -48,7 +48,7 @@ static void printUsage(const char* exe)
         << "Usage: " << exe << " --in <file> --out <assetsDir> [options]\n"
         << "       " << exe << " --in <file1> --in <file2> ... --out <assetsDir>\n"
         << "\n"
-        << "Import source assets (FBX/glTF/textures) into a cooked .ay* cache tree.\n"
+        << "Import FBX/glTF/textures and audio performance/chart JSON into cooked assets.\n"
         << "Matches EditorShellDemo layout: typically --out ayeditor_cache/assets\n"
         << "\n"
         << "Required:\n"

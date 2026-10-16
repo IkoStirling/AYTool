@@ -3,6 +3,14 @@
 Offline CLIs for the Aliyat content pipeline. **Business logic stays in libraries**
 (`AYResource`, `AYStorage`); this module only hosts executables.
 
+Audio authoring (2026-10-16): `import_tool` and `project_build_tool` support
+`.performance.json` / `.chart.json` Cook to self-contained `.acb` PCM/event bundles.
+ProjectBuild validates/hash-checks sample dependencies, supports loose/Pak output
+and writes built-in piano attribution. The two tools stage adjacent piano Cook
+samples and notices so relocation does not require the original engine asset path.
+User sample references must be project Assets-relative. See
+[`AudioContent`](../../AYDocs/sdk/contracts/audio.md#commonaudiocontent).
+
 | EXE | Role |
 |-----|------|
 | `import_tool` | **P5 primary** — FBX/glTF/texture → cooked `.ay*` cache tree |
