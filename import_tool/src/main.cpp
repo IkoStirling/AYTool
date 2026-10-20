@@ -12,6 +12,15 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <optional>
+#include <cmath>
+#include <stdexcept>
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <Windows.h>
+#endif
 
 using ayt::resource::ImportBatchOptions;
 using ayt::resource::ImportBatchResult;
@@ -47,6 +56,8 @@ static void printUsage(const char* exe)
     std::cerr
         << "Usage: " << exe << " --in <file> --out <assetsDir> [options]\n"
         << "       " << exe << " --in <file1> --in <file2> ... --out <assetsDir>\n"
+        << "       " << exe << " --project <root> --recipe <source-id> [--force] [--out <dir>]\n"
+        << "       " << exe << " --project <root> --list-recipes\n"
         << "\n"
         << "Import FBX/glTF/textures and audio performance/chart JSON into cooked assets.\n"
         << "Matches EditorShellDemo layout: typically --out ayeditor_cache/assets\n"
@@ -56,6 +67,11 @@ static void printUsage(const char* exe)
         << "  --out <dir>        Output assets root (meshes/, materials/, …)\n"
         << "\n"
         << "Options:\n"
+        << "  --project <root>   Read durable project import recipes\n"
+        << "  --recipe <id>      Use the complete recipe shown by --list-recipes\n"
+        << "  --list-recipes     List recipe IDs and resolved source paths; no conversion\n"
+        << "                     Recipe mode allows only --force/--out overrides;\n"
+        << "                     command-line settings and cook env do not override it.\n"
         << "  --force            Ignore .dep cache reuse\n"
         << "  --mesh-only        IConverter::LoadOption::MeshOnly\n"
         << "  --animation-only   Extract Animation resources only; do not cook\n"
@@ -94,7 +110,7 @@ static const char* stageName(ImportStage s)
     return "?";
 }
 
-int main(int argc, char* argv[])
+static int runImportTool(int argc, char* argv[])
 {
     ayt::log::LogConfig logConfig;
     logConfig.fileEnabled = false;
@@ -110,6 +126,11 @@ int main(int argc, char* argv[])
 
     std::vector<std::string> inputs;
     std::string outDir;
+    std::string projectRoot;
+    std::string recipeId;
+    bool listRecipes = false;
+    bool explicitSettings = false;
+    std::optional<ImportOptions> projectRecipe;
     bool force = false;
     bool meshOnly = false;
     bool animationOnly = false;
@@ -128,6 +149,13 @@ int main(int argc, char* argv[])
             return argv[++i];
         };
 
+        if (std::strncmp(a,"--source-",9)==0 || std::strcmp(a,"--mesh-only")==0
+            || std::strcmp(a,"--animation-only")==0 || std::strcmp(a,"--no-character")==0
+            || std::strcmp(a,"--cook-textures")==0 || std::strcmp(a,"--stop-on-error")==0)
+            explicitSettings=true;
+        if (std::strcmp(a,"--project")==0) { projectRoot=need("--project"); continue; }
+        if (std::strcmp(a,"--recipe")==0) { recipeId=need("--recipe"); continue; }
+        if (std::strcmp(a,"--list-recipes")==0) { listRecipes=true; continue; }
         if (std::strcmp(a, "-h") == 0 || std::strcmp(a, "--help") == 0) {
             printUsage(argv[0]);
             return 0;
@@ -205,7 +233,14 @@ int main(int argc, char* argv[])
             continue;
         }
         if (std::strcmp(a, "--source-meters-per-unit") == 0) {
-            try { sourceCoordinates.metersPerUnit = std::stof(need("--source-meters-per-unit")); }
+            try {
+                const std::string text=need("--source-meters-per-unit");
+                std::size_t consumed=0;
+                const float value=std::stof(text,&consumed);
+                if(consumed!=text.size() || !std::isfinite(value) || value<0)
+                    throw std::invalid_argument("invalid units");
+                sourceCoordinates.metersPerUnit=value;
+            }
             catch (...) { std::cerr << "Error: invalid meters-per-unit\n"; return 1; }
             continue;
         }
@@ -217,6 +252,30 @@ int main(int argc, char* argv[])
         std::cerr << "Error: unknown argument '" << a << "'\n";
         printUsage(argv[0]);
         return 1;
+    }
+
+    if (!projectRoot.empty() || !recipeId.empty() || listRecipes) {
+        if (projectRoot.empty() || !inputs.empty() || explicitSettings
+            || (listRecipes && (!recipeId.empty() || !outDir.empty() || force))
+            || (!listRecipes && recipeId.empty())) {
+            std::cerr << "Error: use --project with --list-recipes or --recipe; recipe mode "
+                         "accepts only --force and --out overrides.\n";
+            return 1;
+        }
+        std::string error;
+        const auto recipes=ayt::resource::readProjectImportRecipes(projectRoot,&error);
+        if (!error.empty()) { std::cerr<<"Error: "<<error<<"\n"; return 1; }
+        if (listRecipes) {
+            for (const auto& recipe:recipes)
+                std::cout<<recipe.id<<"\t"<<recipe.options.sourcePath<<"\n";
+            return 0;
+        }
+        for (const auto& recipe:recipes) if (recipe.id==recipeId) {
+            projectRecipe=recipe.options; break;
+        }
+        if (!projectRecipe) { std::cerr<<"Error: project import recipe not found: "<<recipeId<<"\n"; return 1; }
+        inputs.push_back(projectRecipe->sourcePath);
+        if (outDir.empty()) outDir=projectRecipe->outputDir;
     }
 
     if (inputs.empty() || outDir.empty()) {
@@ -236,17 +295,19 @@ int main(int argc, char* argv[])
 
     if (inputs.size() == 1) {
         ImportOptions opts;
+        if (projectRecipe) opts=*projectRecipe;
+        else {
+            opts.requireCharacterAssets = requireCharacter && !animationOnly;
+            opts.requireAnimationAssets = animationOnly;
+            opts.loadOption = animationOnly ? IConverter::LoadOption::AnimationOnly
+                            : meshOnly ? IConverter::LoadOption::MeshOnly
+                                       : IConverter::LoadOption::Full;
+            opts.cookTextures = cookTextures || envTrue("AY_IMPORT_COOK_TEXTURES");
+            opts.sourceCoordinates = sourceCoordinates;
+        }
         opts.sourcePath = inputs[0];
         opts.outputDir = outDir;
         opts.force = force;
-        opts.requireCharacterAssets = requireCharacter && !animationOnly;
-        opts.requireAnimationAssets = animationOnly;
-        opts.loadOption = animationOnly ? IConverter::LoadOption::AnimationOnly
-                        : meshOnly ? IConverter::LoadOption::MeshOnly
-                                   : IConverter::LoadOption::Full;
-        opts.cookTextures = cookTextures
-            || envTrue("AY_IMPORT_COOK_TEXTURES");
-        opts.sourceCoordinates = sourceCoordinates;
 
         std::cout << "[import_tool] in=" << opts.sourcePath
                   << " out=" << opts.outputDir << "\n";
@@ -302,3 +363,27 @@ int main(int argc, char* argv[])
     }
     return 0;
 }
+
+
+#if defined(_WIN32)
+int wmain(int argc, wchar_t* argv[])
+{
+    // argv's default ACP spelling loses project/source paths before the shared
+    // UTF-8 importer sees them. Decode the native command line once at entry.
+    std::vector<std::string> owned;
+    owned.reserve(std::size_t(argc));
+    for(int i=0;i<argc;++i) {
+        const int size=WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,argv[i],-1,nullptr,0,nullptr,nullptr);
+        if(size<=0) { std::cerr<<"Error: invalid command-line Unicode\n"; return 1; }
+        std::string text(std::size_t(size),'\0');
+        if(!WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,argv[i],-1,text.data(),size,nullptr,nullptr)) return 1;
+        text.pop_back();
+        owned.push_back(std::move(text));
+    }
+    std::vector<char*> pointers;
+    for(auto& value:owned)pointers.push_back(value.data());
+    return runImportTool(argc,pointers.data());
+}
+#else
+int main(int argc,char* argv[]) { return runImportTool(argc,argv); }
+#endif

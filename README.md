@@ -83,6 +83,31 @@ texture bytes participate in the effect cache key. Particle scenes remain Loose.
 See [ParticleLibrary](../AYParticle/examples/ParticleLibrary/README.md) for the
 five-effect example and packaged playback verification.
 
+### Reuse project authoring recipes (2026-10-21)
+
+Use the same settings that the Editor stores outside disposable caches:
+
+~~~bat
+import_tool --project <project-root> --list-recipes
+import_tool --project <project-root> --recipe source-<id> --force
+import_tool --project <project-root> --recipe source-<id> --out <alternate-assets-root>
+~~~
+
+Recipe IDs are the names shown by --list-recipes. The shared AYResource reader
+resolves project-relative source/output/root references; source identity,
+namespace, coordinate/material settings and cook mode are retained.
+Recipe mode accepts --force and --out overrides; mixed --in or settings flags
+are errors, and AY_IMPORT_COOK_TEXTURES does not silently replace author data.
+The CLI reads recipes; it does not rewrite them or notify another running
+process's GPU cache. Use the Editor's reload/reimport workflow for a live Scene.
+
+Windows uses a native wide command-line entry converted once to UTF-8.
+The module-local AYTool_ImportRecipeChecks target runs genuine CLI imports,
+including Chinese/space paths, recipe listing, complete settings, cache reuse,
+invalid arguments, bad-source retention, repair and explicit output override.
+The corresponding CTest name is AYTool_ImportRecipes. Outputs use fresh nonce
+directories so earlier evidence remains available.
+
 ## cook_tool
 
 ```bat
